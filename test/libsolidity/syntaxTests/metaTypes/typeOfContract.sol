@@ -1,0 +1,6 @@
+contract Test {
+    function creation() public pure returns (bytes memory) {
+        type(Test);
+    }
+}
+// ----
