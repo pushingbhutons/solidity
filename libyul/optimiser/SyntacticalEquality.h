@@ -21,27 +21,73 @@
 #pragma once
 
 #include <libyul/AsmDataForward.h>
+#include <libyul/YulString.h>
 
-#include <vector>
+#include <map>
+#include <type_traits>
 
 namespace yul
 {
 
+
 /**
  * Component that can compare ASTs for equality on a syntactic basis.
- * Ignores source locations but requires exact matches otherwise.
+ * Ignores source locations and allows for different variable names but requires exact matches otherwise.
  *
- * TODO: Only implemented for Expressions for now.
- * A future version might also recognize renamed variables and thus could be used to
- * remove duplicate functions.
+ * Prerequisite: Disambiguator (unless only expressions are compared)
  */
-class SyntacticalEqualityChecker
+class SyntacticallyEqual: public boost::static_visitor<>
 {
 public:
-	static bool equal(Expression const& _e1, Expression const& _e2);
+	bool operator()(Expression const& _lhs, Expression const& _rhs);
+	bool operator()(Statement const& _lhs, Statement const& _rhs);
 
-protected:
-	static bool equalVector(std::vector<Expression> const& _e1, std::vector<Expression> const& _e2);
+	bool operator()(FunctionalInstruction const& _lhs, FunctionalInstruction const& _rhs);
+	bool operator()(FunctionCall const& _lhs, FunctionCall const& _rhs);
+	bool operator()(Identifier const& _lhs, Identifier const& _rhs);
+	bool operator()(Literal const& _lhs, Literal const& _rhs);
+
+	bool operator()(ExpressionStatement const& _lhs, ExpressionStatement const& _rhs);
+	bool operator()(Assignment const& _lhs, Assignment const& _rhs);
+	bool operator()(VariableDeclaration const& _lhs, VariableDeclaration const& _rhs);
+	bool operator()(FunctionDefinition const& _lhs, FunctionDefinition const& _rhs);
+	bool operator()(If const& _lhs, If const& _rhs);
+	bool operator()(Switch const& _lhs, Switch const& _rhs);
+	bool operator()(ForLoop const& _lhs, ForLoop const& _rhs);
+	bool operator()(Block const& _lhs, Block const& _rhs);
+private:
+	bool operator()(TypedName const& _lhs, TypedName const& _rhs);
+	bool operator()(Case const& _lhs, Case const& _rhs);
+
+	bool operator()(Instruction const& _lhs, Instruction const& _rhs);
+	bool operator()(Label const& _lhs, Label const& _rhs);
+	bool operator()(StackAssignment const& _lhs, StackAssignment const& _rhs);
+
+	template<typename T>
+	bool operator()(std::vector<T> const& _lhs, std::vector<T> const& _rhs)
+	{
+		return std::equal(
+			_lhs.begin(),
+			_lhs.end(),
+			_rhs.begin(),
+			_rhs.end(),
+			[this](auto&& _lhs, auto&& _rhs) -> bool { return (*this)(_lhs, _rhs); }
+		);
+	}
+	template<typename U, typename V>
+	bool operator()(U const&, V const&, std::enable_if_t<!std::is_same<U, V>::value>* = nullptr)
+	{
+		return false;
+	}
+	template<typename T>
+	bool operator()(std::shared_ptr<T> const& _lhs, std::shared_ptr<T> const& _rhs)
+	{
+		return (_lhs == _rhs) || (_lhs && _rhs && (*this)(*_lhs, *_rhs)) || (!_lhs && !_rhs);
+	}
+
+	std::size_t m_idsUsed = 0;
+	std::map<YulString, std::size_t> m_identifiersLHS;
+	std::map<YulString, std::size_t> m_identifiersRHS;
 };
 
 }
