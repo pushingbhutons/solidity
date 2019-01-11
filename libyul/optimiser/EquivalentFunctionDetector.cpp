@@ -36,7 +36,7 @@ void EquivalentFunctionDetector::operator()(FunctionDefinition const& _fun)
 	if (!it.second)
 	{
 		for (auto const& candidate: it.first->second)
-			if (SyntacticallyEqual{}(_fun, *candidate))
+			if (SyntacticallyEqual{}.statementEqual(_fun, *candidate))
 			{
 				m_duplicates[_fun.name] = candidate;
 				return;

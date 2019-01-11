@@ -36,53 +36,61 @@ namespace yul
  *
  * Prerequisite: Disambiguator (unless only expressions are compared)
  */
-class SyntacticallyEqual: public boost::static_visitor<>
+class SyntacticallyEqual
 {
 public:
 	bool operator()(Expression const& _lhs, Expression const& _rhs);
 	bool operator()(Statement const& _lhs, Statement const& _rhs);
 
-	bool operator()(FunctionalInstruction const& _lhs, FunctionalInstruction const& _rhs);
-	bool operator()(FunctionCall const& _lhs, FunctionCall const& _rhs);
-	bool operator()(Identifier const& _lhs, Identifier const& _rhs);
-	bool operator()(Literal const& _lhs, Literal const& _rhs);
+	bool expressionEqual(FunctionalInstruction const& _lhs, FunctionalInstruction const& _rhs);
+	bool expressionEqual(FunctionCall const& _lhs, FunctionCall const& _rhs);
+	bool expressionEqual(Identifier const& _lhs, Identifier const& _rhs);
+	bool expressionEqual(Literal const& _lhs, Literal const& _rhs);
 
-	bool operator()(ExpressionStatement const& _lhs, ExpressionStatement const& _rhs);
-	bool operator()(Assignment const& _lhs, Assignment const& _rhs);
-	bool operator()(VariableDeclaration const& _lhs, VariableDeclaration const& _rhs);
-	bool operator()(FunctionDefinition const& _lhs, FunctionDefinition const& _rhs);
-	bool operator()(If const& _lhs, If const& _rhs);
-	bool operator()(Switch const& _lhs, Switch const& _rhs);
-	bool operator()(ForLoop const& _lhs, ForLoop const& _rhs);
-	bool operator()(Block const& _lhs, Block const& _rhs);
+	bool statementEqual(ExpressionStatement const& _lhs, ExpressionStatement const& _rhs);
+	bool statementEqual(Assignment const& _lhs, Assignment const& _rhs);
+	bool statementEqual(VariableDeclaration const& _lhs, VariableDeclaration const& _rhs);
+	bool statementEqual(FunctionDefinition const& _lhs, FunctionDefinition const& _rhs);
+	bool statementEqual(If const& _lhs, If const& _rhs);
+	bool statementEqual(Switch const& _lhs, Switch const& _rhs);
+	bool switchCaseEqual(Case const& _lhs, Case const& _rhs);
+	bool statementEqual(ForLoop const& _lhs, ForLoop const& _rhs);
+	bool statementEqual(Block const& _lhs, Block const& _rhs);
 private:
-	bool operator()(TypedName const& _lhs, TypedName const& _rhs);
-	bool operator()(Case const& _lhs, Case const& _rhs);
+	bool statementEqual(Instruction const& _lhs, Instruction const& _rhs);
+	bool statementEqual(Label const& _lhs, Label const& _rhs);
+	bool statementEqual(StackAssignment const& _lhs, StackAssignment const& _rhs);
 
-	bool operator()(Instruction const& _lhs, Instruction const& _rhs);
-	bool operator()(Label const& _lhs, Label const& _rhs);
-	bool operator()(StackAssignment const& _lhs, StackAssignment const& _rhs);
+	bool visitDeclaration(TypedName const& _lhs, TypedName const& _rhs);
 
-	template<typename T>
-	bool operator()(std::vector<T> const& _lhs, std::vector<T> const& _rhs)
+	template<typename U, typename V>
+	bool expressionEqual(U const&, V const&, std::enable_if_t<!std::is_same<U, V>::value>* = nullptr)
+	{
+		return false;
+	}
+
+	template<typename U, typename V>
+	bool statementEqual(U const&, V const&, std::enable_if_t<!std::is_same<U, V>::value>* = nullptr)
+	{
+		return false;
+	}
+
+	template<typename T, bool (SyntacticallyEqual::*CompareMember)(T const&, T const&)>
+	bool compareSharedPtr(std::shared_ptr<T> const& _lhs, std::shared_ptr<T> const& _rhs)
+	{
+		return (_lhs == _rhs) || (_lhs && _rhs && (this->*CompareMember)(*_lhs, *_rhs)) || (!_lhs && !_rhs);
+	}
+
+	template<typename T, bool (SyntacticallyEqual::*CompareMember)(T const&, T const&)>
+	bool compareVector(std::vector<T> const& _lhs, std::vector<T> const& _rhs)
 	{
 		return std::equal(
 			_lhs.begin(),
 			_lhs.end(),
 			_rhs.begin(),
 			_rhs.end(),
-			[this](auto&& _lhs, auto&& _rhs) -> bool { return (*this)(_lhs, _rhs); }
+			[&](auto&& _lhs, auto&& _rhs) -> bool { return (this->*CompareMember)(_lhs, _rhs); }
 		);
-	}
-	template<typename U, typename V>
-	bool operator()(U const&, V const&, std::enable_if_t<!std::is_same<U, V>::value>* = nullptr)
-	{
-		return false;
-	}
-	template<typename T>
-	bool operator()(std::shared_ptr<T> const& _lhs, std::shared_ptr<T> const& _rhs)
-	{
-		return (_lhs == _rhs) || (_lhs && _rhs && (*this)(*_lhs, *_rhs)) || (!_lhs && !_rhs);
 	}
 
 	std::size_t m_idsUsed = 0;
